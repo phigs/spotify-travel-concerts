@@ -1,0 +1,24 @@
+{
+  "name": "spotify-travel-concerts",
+  "version": "1.0.0",
+  "description": "Find concerts based on Spotify listening history and travel plans",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "start-https": "node server-https.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5",
+    "querystring": "^0.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["spotify", "concerts", "travel", "music"],
+  "author": "",
+  "license": "MIT"
+} 
