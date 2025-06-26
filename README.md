@@ -9,7 +9,7 @@ Find concerts based on your Spotify listening history and travel plans!
 3. **Get Recommendations** - Find concerts that match your music taste in your destination
 
 The app cross-references your top Spotify artists with concerts happening in your travel destination and provides personalized recommendations with explanations like:
-> "Because you listen to The Beatles, you might like Arctic Monkeys playing in Copenhagen on June 12!"
+> "Because you listen to Bob Dylan, you might like Donovan playing in London on May 9th"
 
 ## Features
 
