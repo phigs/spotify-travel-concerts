@@ -1,4 +1,4 @@
-# 🎵 Spotify Travel Concerts
+# Spotify Travel Concerts
 
 Find concerts based on your Spotify listening history and travel plans!
 
@@ -13,13 +13,13 @@ The app cross-references your top Spotify artists with concerts happening in you
 
 ## Features
 
-- ✅ Spotify OAuth authentication
-- ✅ Get user's top artists from Spotify
-- ✅ Search concerts by location and date range (using Songkick API)
-- ✅ Cross-reference user's music taste with available concerts
-- ✅ Use Spotify's recommendation engine to find similar artists
-- ✅ Generate personalized explanations for each recommendation
-- ✅ Simple web interface
+- Spotify OAuth authentication
+- Get user's top artists from Spotify
+- Search concerts by location and date range (using Songkick API)
+- Cross-reference user's music taste with available concerts
+- Use Spotify's recommendation engine to find similar artists
+- Generate personalized explanations for each recommendation
+- Simple web interface
 
 ## Setup
 
@@ -95,7 +95,3 @@ Visit `http://localhost:3000` in your browser!
 - **APIs**: Spotify Web API, Songkick API
 - **Frontend**: Simple HTML/CSS/JavaScript
 - **Authentication**: Spotify OAuth 2.0
-
-## License
-
-MIT 
