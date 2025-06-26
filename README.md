@@ -1,4 +1,4 @@
-# 🎵 Spotify Travel Concerts
+# Spotify Travel Concerts
 
 Find concerts based on your Spotify listening history and travel plans using **multiple concert APIs** for comprehensive coverage!
 
@@ -8,6 +8,7 @@ Find concerts based on your Spotify listening history and travel plans using **m
 2. **Enter Travel Plans** - Specify location and dates for your trip
 3. **Get Recommendations** - Find concerts that match your music taste in your destination
 
+<<<<<<< HEAD
 The app cross-references your top Spotify artists with concerts from **Ticketmaster**, **Bandsintown**, **Eventbrite**, **Resident Advisor**, **Dice**, and **NTS Radio** to provide the most comprehensive recommendations with explanations like:
 > "Because you listen to The Beatles, you might like Arctic Monkeys playing in Copenhagen on June 12!"
 
@@ -23,6 +24,20 @@ The app cross-references your top Spotify artists with concerts from **Ticketmas
 - ✅ **Direct ticket links** to purchase
 - ✅ **Event type indicators** (electronic ⚡, independent 🎸, radio 📻)
 - ✅ Simple web interface
+=======
+The app cross-references your top Spotify artists with concerts happening in your travel destination and provides personalized recommendations with explanations like:
+> "Because you listen to Bob Dylan, you might like Donovan playing in London on May 9th"
+
+## Features
+
+- Spotify OAuth authentication
+- Get user's top artists from Spotify
+- Search concerts by location and date range (using Songkick API)
+- Cross-reference user's music taste with available concerts
+- Use Spotify's recommendation engine to find similar artists
+- Generate personalized explanations for each recommendation
+- Simple web interface
+>>>>>>> e25b28d32cc34af11fb5c587a96120e281576dc7
 
 ## Setup
 
@@ -150,7 +165,10 @@ Visit `http://localhost:3000` in your browser!
 - **APIs**: Spotify Web API, Ticketmaster Discovery API, Bandsintown API, Eventbrite API, Resident Advisor API, Dice API, NTS Radio API
 - **Frontend**: Simple HTML/CSS/JavaScript
 - **Authentication**: Spotify OAuth 2.0
+<<<<<<< HEAD
 
 ## License
 
 MIT
+=======
+>>>>>>> e25b28d32cc34af11fb5c587a96120e281576dc7
