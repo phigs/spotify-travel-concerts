@@ -493,7 +493,7 @@ app.get('/', (req, res) => {
                     
                     let html = \`
                         <div class="container">
-                            <h2>🎤 Concerts in \${data.location}</h2>
+                            <h2>Concerts in \${data.location}</h2>
                             <p><strong>Date Range:</strong> \${data.dateRange.start} to \${data.dateRange.end}</p>
                             <p><strong>Total Concerts Found:</strong> \${data.totalConcertsFound}</p>
                             <p><strong>Data Sources:</strong> Ticketmaster, Bandsintown, Eventbrite, Resident Advisor, Dice, NTS Radio</p>
@@ -501,7 +501,7 @@ app.get('/', (req, res) => {
                             <h3>Your Top Artists:</h3>
                             <p>\${data.userTopArtists.map(artist => artist.name).join(', ')}</p>
                             
-                            <h3>🎵 Recommendations:</h3>
+                            <h3>Recommendations:</h3>
                     \`;
 
                     if (data.recommendations.length === 0) {
