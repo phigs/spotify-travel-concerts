@@ -1,9 +1,3 @@
-const OpenAI = require('openai');
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-});
-
 /**
  * Use AI to find intelligent matches between user's music taste and available concerts
  */
@@ -14,6 +8,12 @@ async function findIntelligentMatches(userArtists, concerts) {
     }
 
     try {
+        // Only require OpenAI when we actually need it
+        const OpenAI = require('openai');
+        const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY
+        });
+
         const userArtistNames = userArtists.slice(0, 10).map(a => a.name).join(', ');
         const concertList = concerts.slice(0, 20).map(c => 
             `${c.name} (${c.artists.join(', ')}) - ${c.venue}, ${c.date}`
