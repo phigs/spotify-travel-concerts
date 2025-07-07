@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const querystring = require('querystring');
+const { findIntelligentMatches } = require('./services/aiService');
 require('dotenv').config();
 
 const app = express();
@@ -343,7 +344,7 @@ app.post('/find-concerts', async (req, res) => {
         // Cross-reference and create recommendations
         const recommendations = [];
 
-        // Direct matches (artists user listens to are playing)
+        // 1. Direct matches (exact artist names)
         for (const concert of concerts) {
             for (const artist of topArtists) {
                 if (concert.artists.some(concertArtist => 
@@ -354,45 +355,74 @@ app.post('/find-concerts', async (req, res) => {
                         type: 'direct_match',
                         concert: concert,
                         reason: `Because you listen to ${artist.name}, you might like this concert!`,
-                        matchArtist: artist.name
+                        matchArtist: artist.name,
+                        confidence: 0.95
                     });
                 }
             }
         }
 
-        // Similar artists (using Spotify recommendations)
-        for (const artist of topArtists.slice(0, 3)) { // Check top 3 artists
+        // 2. AI-enhanced recommendations
+        try {
+            const aiRecommendations = await findIntelligentMatches(topArtists, concerts);
+            
+            for (const aiMatch of aiRecommendations) {
+                const matchedConcert = concerts.find(c => c.name === aiMatch.concertName);
+                if (matchedConcert && !recommendations.some(r => r.concert.name === matchedConcert.name)) {
+                    recommendations.push({
+                        type: 'ai_match',
+                        concert: matchedConcert,
+                        reason: aiMatch.reason,
+                        confidence: aiMatch.confidence
+                    });
+                }
+            }
+        } catch (error) {
+            console.log('AI recommendations unavailable:', error.message);
+        }
+
+        // 3. Spotify similarity fallback (for remaining concerts)
+        for (const artist of topArtists.slice(0, 3)) {
             const similarArtists = await getSpotifyRecommendations(userId, artist.name);
             
             for (const concert of concerts) {
-                for (const similarArtist of similarArtists.slice(0, 5)) { // Check top 5 similar
+                // Skip if already recommended
+                if (recommendations.some(r => r.concert.name === concert.name)) continue;
+                
+                for (const similarArtist of similarArtists.slice(0, 5)) {
                     if (concert.artists.some(concertArtist => 
                         concertArtist.toLowerCase().includes(similarArtist.artist.toLowerCase()) ||
                         similarArtist.artist.toLowerCase().includes(concertArtist.toLowerCase())
                     )) {
                         recommendations.push({
-                            type: 'similar_artist',
+                            type: 'spotify_similar',
                             concert: concert,
                             reason: `Because you listen to ${artist.name}, you might like ${similarArtist.artist} playing in ${concert.city}!`,
                             matchArtist: similarArtist.artist,
-                            basedOn: artist.name
+                            basedOn: artist.name,
+                            confidence: 0.7
                         });
+                        break;
                     }
                 }
             }
         }
 
-        // Remove duplicates
-        const uniqueRecommendations = recommendations.filter((rec, index, self) => 
-            index === self.findIndex(r => r.concert.name === rec.concert.name)
-        );
+        // Sort by confidence and remove duplicates
+        const uniqueRecommendations = recommendations
+            .filter((rec, index, self) => 
+                index === self.findIndex(r => r.concert.name === rec.concert.name)
+            )
+            .sort((a, b) => (b.confidence || 0.5) - (a.confidence || 0.5))
+            .slice(0, 10);
 
         res.json({
             location: location,
             dateRange: { start: startDate, end: endDate },
             userTopArtists: topArtists.slice(0, 5),
             totalConcertsFound: concerts.length,
-            recommendations: uniqueRecommendations.slice(0, 10) // Limit to top 10
+            recommendations: uniqueRecommendations,
+            aiEnabled: !!process.env.OPENAI_API_KEY
         });
 
     } catch (error) {
@@ -512,14 +542,24 @@ app.get('/', (req, res) => {
                                            rec.concert.type === 'independent' ? '🎸' : 
                                            rec.concert.type === 'radio' ? '📻' : '🎵';
                             
+                            const matchIcon = rec.type === 'direct_match' ? '🎯' :
+                                            rec.type === 'ai_match' ? '🤖' :
+                                            rec.type === 'spotify_similar' ? '🎵' : '💡';
+                            
+                            const confidenceBar = rec.confidence ? 
+                                \`<div style="background: #ddd; border-radius: 10px; height: 4px; margin: 5px 0;">
+                                    <div style="background: #1DB954; height: 4px; border-radius: 10px; width: \${rec.confidence * 100}%;"></div>
+                                 </div>\` : '';
+                            
                             html += \`
                                 <div class="recommendation">
-                                    <h4>\${typeIcon} \${rec.concert.name}</h4>
+                                    <h4>\${typeIcon} \${rec.concert.name} \${matchIcon}</h4>
                                     <p><strong>Date:</strong> \${rec.concert.date}</p>
                                     <p><strong>Venue:</strong> \${rec.concert.venue}</p>
                                     <p><strong>Artists:</strong> \${rec.concert.artists.join(', ')}</p>
                                     <p><strong>Source:</strong> \${rec.concert.source}</p>
                                     <p><em>💡 \${rec.reason}</em></p>
+                                    \${confidenceBar}
                                     \${rec.concert.url ? \`<p><a href="\${rec.concert.url}" target="_blank">🎫 Get Tickets</a></p>\` : ''}
                                 </div>
                             \`;
