@@ -97,197 +97,156 @@ async function getUserTopArtists(userId) {
 
 // 4. Search for concerts across multiple APIs
 async function searchConcerts(location, startDate, endDate) {
+    console.log(`🔍 Starting concert search for ${location} from ${startDate} to ${endDate}`);
+    const allConcerts = [];
+    const apiResults = {
+        ticketmaster: { success: false, count: 0, error: null },
+        bandsintown: { success: false, count: 0, error: null },
+        eventbrite: { success: false, count: 0, error: null }
+    };
+    
+    // Search Ticketmaster Discovery API
     try {
-        const allConcerts = [];
+        console.log('🎫 Searching Ticketmaster...');
+        if (!process.env.TICKETMASTER_API_KEY) {
+            throw new Error('Ticketmaster API key not configured');
+        }
         
-        // Search Ticketmaster Discovery API
-        try {
-            const ticketmasterResponse = await axios.get(`${TICKETMASTER_API}/events.json`, {
-                params: {
-                    apikey: process.env.TICKETMASTER_API_KEY,
-                    city: location,
-                    startDateTime: `${startDate}T00:00:00Z`,
-                    endDateTime: `${endDate}T23:59:59Z`,
-                    classificationName: 'music',
-                    size: 50
-                }
-            });
+        const ticketmasterResponse = await axios.get(`${TICKETMASTER_API}/events.json`, {
+            params: {
+                apikey: process.env.TICKETMASTER_API_KEY,
+                city: location,
+                startDateTime: `${startDate}T00:00:00Z`,
+                endDateTime: `${endDate}T23:59:59Z`,
+                classificationName: 'music',
+                size: 50
+            },
+            timeout: 10000 // 10 second timeout for Vercel
+        });
 
-            if (ticketmasterResponse.data._embedded && ticketmasterResponse.data._embedded.events) {
-                const ticketmasterEvents = ticketmasterResponse.data._embedded.events.map(event => ({
-                    name: event.name,
-                    date: event.dates.start.localDate,
-                    venue: event._embedded.venues[0].name,
-                    city: event._embedded.venues[0].city.name,
-                    artists: event._embedded.attractions ? event._embedded.attractions.map(attraction => attraction.name) : [],
-                    source: 'Ticketmaster',
-                    url: event.url
-                }));
-                allConcerts.push(...ticketmasterEvents);
-            }
-        } catch (error) {
-            console.log('Ticketmaster API error:', error.message);
+        if (ticketmasterResponse.data._embedded && ticketmasterResponse.data._embedded.events) {
+            const ticketmasterEvents = ticketmasterResponse.data._embedded.events.map(event => ({
+                name: event.name,
+                date: event.dates.start.localDate,
+                venue: event._embedded.venues[0].name,
+                city: event._embedded.venues[0].city.name,
+                artists: event._embedded.attractions ? event._embedded.attractions.map(attraction => attraction.name) : [event.name],
+                source: 'Ticketmaster',
+                url: event.url
+            }));
+            allConcerts.push(...ticketmasterEvents);
+            apiResults.ticketmaster = { success: true, count: ticketmasterEvents.length, error: null };
+            console.log(`✅ Ticketmaster: Found ${ticketmasterEvents.length} events`);
+        } else {
+            apiResults.ticketmaster = { success: true, count: 0, error: 'No events found' };
+            console.log('⚠️ Ticketmaster: No events in response');
         }
-
-        // Search Bandsintown API
-        try {
-            const bandsintownResponse = await axios.get(`${BANDSINTOWN_API}/events`, {
-                params: {
-                    app_id: process.env.BANDSINTOWN_APP_ID || 'spotify-travel-concerts',
-                    location: location,
-                    date: `${startDate},${endDate}`
-                }
-            });
-
-            if (bandsintownResponse.data && bandsintownResponse.data.length > 0) {
-                const bandsintownEvents = bandsintownResponse.data.map(event => ({
-                    name: event.title,
-                    date: event.datetime.split('T')[0],
-                    venue: event.venue.name,
-                    city: event.venue.city,
-                    artists: event.lineup || [],
-                    source: 'Bandsintown',
-                    url: event.url
-                }));
-                allConcerts.push(...bandsintownEvents);
-            }
-        } catch (error) {
-            console.log('Bandsintown API error:', error.message);
-        }
-
-        // Search Eventbrite API
-        try {
-            const eventbriteResponse = await axios.get(`${EVENTBRITE_API}/events/search/`, {
-                params: {
-                    token: process.env.EVENTBRITE_API_KEY,
-                    'location.address': location,
-                    'start_date.range_start': `${startDate}T00:00:00Z`,
-                    'start_date.range_end': `${endDate}T23:59:59Z`,
-                    categories: '103', // Music category
-                    expand: 'venue'
-                }
-            });
-
-            if (eventbriteResponse.data.events) {
-                const eventbriteEvents = eventbriteResponse.data.events.map(event => ({
-                    name: event.name.text,
-                    date: event.start.local.split('T')[0],
-                    venue: event.venue ? event.venue.name : 'TBD',
-                    city: event.venue ? event.venue.address.city : location,
-                    artists: [event.name.text], // Eventbrite doesn't separate artists
-                    source: 'Eventbrite',
-                    url: event.url
-                }));
-                allConcerts.push(...eventbriteEvents);
-            }
-        } catch (error) {
-            console.log('Eventbrite API error:', error.message);
-        }
-
-        // Search Resident Advisor (Electronic Music Events)
-        try {
-            const raResponse = await axios.get(`${RESIDENT_ADVISOR_API}/events`, {
-                params: {
-                    location: location,
-                    start_date: startDate,
-                    end_date: endDate,
-                    limit: 50
-                }
-            });
-
-            if (raResponse.data && raResponse.data.data) {
-                const raEvents = raResponse.data.data.map(event => ({
-                    name: event.title,
-                    date: event.date,
-                    venue: event.venue.name,
-                    city: event.venue.city,
-                    artists: event.artists.map(artist => artist.name),
-                    source: 'Resident Advisor',
-                    url: `https://ra.co/events/${event.id}`,
-                    type: 'electronic'
-                }));
-                allConcerts.push(...raEvents);
-            }
-        } catch (error) {
-            console.log('Resident Advisor API error:', error.message);
-        }
-
-        // Search Dice (Independent Venues)
-        try {
-            const diceResponse = await axios.get(`${DICE_API}/events`, {
-                params: {
-                    location: location,
-                    start_date: startDate,
-                    end_date: endDate,
-                    limit: 50
-                }
-            });
-
-            if (diceResponse.data && diceResponse.data.events) {
-                const diceEvents = diceResponse.data.events.map(event => ({
-                    name: event.name,
-                    date: event.date,
-                    venue: event.venue.name,
-                    city: event.venue.city,
-                    artists: event.artists.map(artist => artist.name),
-                    source: 'Dice',
-                    url: event.url,
-                    type: 'independent'
-                }));
-                allConcerts.push(...diceEvents);
-            }
-        } catch (error) {
-            console.log('Dice API error:', error.message);
-        }
-
-        // Search NTS Radio (Radio Shows & Live Events)
-        try {
-            const ntsResponse = await axios.get(`${NTS_API}/shows`, {
-                params: {
-                    location: location,
-                    start_date: startDate,
-                    end_date: endDate,
-                    limit: 50
-                }
-            });
-
-            if (ntsResponse.data && ntsResponse.data.shows) {
-                const ntsEvents = ntsResponse.data.shows
-                    .filter(show => show.type === 'live' || show.type === 'event')
-                    .map(show => ({
-                        name: show.title,
-                        date: show.start_time.split('T')[0],
-                        venue: show.venue || 'NTS Radio',
-                        city: show.location || location,
-                        artists: show.hosts.map(host => host.name),
-                        source: 'NTS Radio',
-                        url: show.url,
-                        type: 'radio'
-                    }));
-                allConcerts.push(...ntsEvents);
-            }
-        } catch (error) {
-            console.log('NTS API error:', error.message);
-        }
-
-        // Remove duplicates based on name, date, and venue
-        const uniqueConcerts = allConcerts.filter((concert, index, self) => 
-            index === self.findIndex(c => 
-                c.name.toLowerCase() === concert.name.toLowerCase() &&
-                c.date === concert.date &&
-                c.venue.toLowerCase() === concert.venue.toLowerCase()
-            )
-        );
-
-        // Sort by date
-        uniqueConcerts.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        return uniqueConcerts;
-
     } catch (error) {
-        console.error('Error searching concerts:', error);
-        return [];
+        apiResults.ticketmaster = { success: false, count: 0, error: error.message };
+        console.log('❌ Ticketmaster API error:', error.message);
     }
+
+    // Search Bandsintown API (simplified approach)
+    try {
+        console.log('🎵 Searching Bandsintown...');
+        const bandsintownResponse = await axios.get(`${BANDSINTOWN_API}/events`, {
+            params: {
+                app_id: 'spotify-travel-concerts',
+                location: location,
+                date: `${startDate},${endDate}`
+            },
+            timeout: 8000 // 8 second timeout
+        });
+
+        if (bandsintownResponse.data && Array.isArray(bandsintownResponse.data) && bandsintownResponse.data.length > 0) {
+            const bandsintownEvents = bandsintownResponse.data.map(event => ({
+                name: event.title || event.description || 'Concert Event',
+                date: event.datetime ? event.datetime.split('T')[0] : startDate,
+                venue: event.venue ? event.venue.name : 'TBD',
+                city: event.venue ? event.venue.city : location,
+                artists: event.lineup || [event.artist?.name || 'Various Artists'],
+                source: 'Bandsintown',
+                url: event.url || event.facebook_rsvp_url
+            }));
+            allConcerts.push(...bandsintownEvents);
+            apiResults.bandsintown = { success: true, count: bandsintownEvents.length, error: null };
+            console.log(`✅ Bandsintown: Found ${bandsintownEvents.length} events`);
+        } else {
+            apiResults.bandsintown = { success: true, count: 0, error: 'No events found' };
+            console.log('⚠️ Bandsintown: No events in response');
+        }
+    } catch (error) {
+        apiResults.bandsintown = { success: false, count: 0, error: error.message };
+        console.log('❌ Bandsintown API error:', error.message);
+    }
+
+    // Search Eventbrite API
+    try {
+        console.log('🎪 Searching Eventbrite...');
+        if (!process.env.EVENTBRITE_API_KEY) {
+            throw new Error('Eventbrite API key not configured');
+        }
+        
+        const eventbriteResponse = await axios.get(`${EVENTBRITE_API}/events/search/`, {
+            params: {
+                token: process.env.EVENTBRITE_API_KEY,
+                'location.address': location,
+                'start_date.range_start': `${startDate}T00:00:00Z`,
+                'start_date.range_end': `${endDate}T23:59:59Z`,
+                categories: '103', // Music category
+                expand: 'venue'
+            },
+            timeout: 8000
+        });
+
+        if (eventbriteResponse.data.events && eventbriteResponse.data.events.length > 0) {
+            const eventbriteEvents = eventbriteResponse.data.events.map(event => ({
+                name: event.name.text,
+                date: event.start.local.split('T')[0],
+                venue: event.venue ? event.venue.name : 'TBD',
+                city: event.venue ? event.venue.address.city : location,
+                artists: [event.name.text],
+                source: 'Eventbrite',
+                url: event.url
+            }));
+            allConcerts.push(...eventbriteEvents);
+            apiResults.eventbrite = { success: true, count: eventbriteEvents.length, error: null };
+            console.log(`✅ Eventbrite: Found ${eventbriteEvents.length} events`);
+        } else {
+            apiResults.eventbrite = { success: true, count: 0, error: 'No events found' };
+            console.log('⚠️ Eventbrite: No events in response');
+        }
+    } catch (error) {
+        apiResults.eventbrite = { success: false, count: 0, error: error.message };
+        console.log('❌ Eventbrite API error:', error.message);
+    }
+
+    // Log final results for debugging
+    console.log('📊 API Results Summary:', JSON.stringify(apiResults, null, 2));
+    console.log(`🎉 Total concerts found: ${allConcerts.length}`);
+
+    // Remove duplicates and sort
+    const uniqueConcerts = allConcerts.filter((concert, index, self) => 
+        index === self.findIndex(c => 
+            c.name.toLowerCase() === concert.name.toLowerCase() &&
+            c.date === concert.date &&
+            c.venue.toLowerCase() === concert.venue.toLowerCase()
+        )
+    );
+
+    uniqueConcerts.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    console.log(`✨ Unique concerts after deduplication: ${uniqueConcerts.length}`);
+    
+    // Add debug info to response
+    uniqueConcerts._debug = {
+        searchParams: { location, startDate, endDate },
+        apiResults,
+        totalFound: allConcerts.length,
+        afterDedup: uniqueConcerts.length
+    };
+
+    return uniqueConcerts;
 }
 
 // 5. Get Spotify recommendations for an artist
@@ -422,7 +381,8 @@ app.post('/find-concerts', async (req, res) => {
             userTopArtists: topArtists.slice(0, 5),
             totalConcertsFound: concerts.length,
             recommendations: uniqueRecommendations,
-            aiEnabled: !!process.env.OPENAI_API_KEY
+            aiEnabled: !!process.env.OPENAI_API_KEY,
+            debug: concerts._debug
         });
 
     } catch (error) {
@@ -523,19 +483,46 @@ app.get('/', (req, res) => {
                     
                     let html = \`
                         <div class="container">
-                            <h2>Concerts in \${data.location}</h2>
-                            <p><strong>Date Range:</strong> \${data.dateRange.start} to \${data.dateRange.end}</p>
-                            <p><strong>Total Concerts Found:</strong> \${data.totalConcertsFound}</p>
-                            <p><strong>Data Sources:</strong> Ticketmaster, Bandsintown, Eventbrite, Resident Advisor, Dice, NTS Radio</p>
-                            
-                            <h3>Your Top Artists:</h3>
-                            <p>\${data.userTopArtists.map(artist => artist.name).join(', ')}</p>
-                            
-                            <h3>Recommendations:</h3>
+                            <h2>🎵 Concert Search Results for \${data.location}</h2>
+                            <p><strong>📅 Date Range:</strong> \${data.dateRange.start} to \${data.dateRange.end}</p>
+                            <p><strong>🔍 Total Concerts Found:</strong> \${data.totalConcertsFound}</p>
+                            <p><strong>🎧 Your Top Artists:</strong> \${data.userTopArtists.map(artist => artist.name).join(', ')}</p>
+                            <p><strong>🤖 AI Enhanced:</strong> \${data.aiEnabled ? '✅ Enabled' : '❌ Not Available'}</p>
                     \`;
 
+                    // Show debug info if available
+                    if (data.debug) {
+                        html += \`
+                            <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 12px;">
+                                <strong>🔧 Debug Info:</strong><br>
+                                <strong>Ticketmaster:</strong> \${data.debug.apiResults.ticketmaster.success ? 
+                                    \`✅ \${data.debug.apiResults.ticketmaster.count} events\` : 
+                                    \`❌ \${data.debug.apiResults.ticketmaster.error}\`}<br>
+                                <strong>Bandsintown:</strong> \${data.debug.apiResults.bandsintown.success ? 
+                                    \`✅ \${data.debug.apiResults.bandsintown.count} events\` : 
+                                    \`❌ \${data.debug.apiResults.bandsintown.error}\`}<br>
+                                <strong>Eventbrite:</strong> \${data.debug.apiResults.eventbrite.success ? 
+                                    \`✅ \${data.debug.apiResults.eventbrite.count} events\` : 
+                                    \`❌ \${data.debug.apiResults.eventbrite.error}\`}<br>
+                                <strong>Total Found:</strong> \${data.debug.totalFound} → <strong>After Dedup:</strong> \${data.debug.afterDedup}
+                            </div>
+                        \`;
+                    }
+
+                    html += '<h3>🎯 Personalized Recommendations:</h3>';
+
                     if (data.recommendations.length === 0) {
-                        html += '<p>No concerts found that match your music taste for this location and dates.</p>';
+                        html += '<p>😔 No concerts found that match your music taste for this location and dates.</p>';
+                        if (data.totalConcertsFound > 0) {
+                            html += '<p>💡 Try searching for a different location or expanding your date range.</p>';
+                        } else {
+                            html += '<p>💡 No concerts were found at all. This might be due to:</p>';
+                            html += '<ul>';
+                            html += '<li>🌍 The location name might not be recognized by the APIs</li>';
+                            html += '<li>📅 No events scheduled for these dates</li>';
+                            html += '<li>🔧 API issues (check debug info above)</li>';
+                            html += '</ul>';
+                        }
                     } else {
                         data.recommendations.forEach(rec => {
                             const typeIcon = rec.concert.type === 'electronic' ? '⚡' : 
@@ -554,10 +541,10 @@ app.get('/', (req, res) => {
                             html += \`
                                 <div class="recommendation">
                                     <h4>\${typeIcon} \${rec.concert.name} \${matchIcon}</h4>
-                                    <p><strong>Date:</strong> \${rec.concert.date}</p>
-                                    <p><strong>Venue:</strong> \${rec.concert.venue}</p>
-                                    <p><strong>Artists:</strong> \${rec.concert.artists.join(', ')}</p>
-                                    <p><strong>Source:</strong> \${rec.concert.source}</p>
+                                    <p><strong>📅 Date:</strong> \${rec.concert.date}</p>
+                                    <p><strong>🏛️ Venue:</strong> \${rec.concert.venue}</p>
+                                    <p><strong>🎤 Artists:</strong> \${rec.concert.artists.join(', ')}</p>
+                                    <p><strong>📍 Source:</strong> \${rec.concert.source}</p>
                                     <p><em>💡 \${rec.reason}</em></p>
                                     \${confidenceBar}
                                     \${rec.concert.url ? \`<p><a href="\${rec.concert.url}" target="_blank">🎫 Get Tickets</a></p>\` : ''}
